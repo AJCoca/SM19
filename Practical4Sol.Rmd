@@ -1,0 +1,75 @@
+---
+output: 
+  pdf_document:
+    fig_width: 6
+    fig_height: 4
+fontsize: 10pt
+papersize: a4paper
+header-includes:
+- \usepackage{amsmath,amsfonts}
+---
+
+\textbf{STATISTICAL MODELLING} \hfill Part IIC, Michaelmas 2019
+
+\vspace{-0.2cm}
+\textbf{Practical 4: More on linear regression} \hfill By courtesy of Dr. S. A. Bacallado and Dr. R. Shah
+
+## Solutions
+
+```{r}
+file_path <- "https://raw.githubusercontent.com/AJCoca/SM19/master/"
+Movies <- read.csv(paste(file_path, "Movies.csv", sep =""))
+attach(Movies)
+
+MoviesLM <- lm(log(Total.Gross) ~ log(Opening) + Screens + RT + log(Budget))
+lev <- hatvalues(MoviesLM)
+high_lev <- which(lev > 3*4/nrow(Movies)) # gives the high leverage obs
+lev[high_lev] # actually shows their leverage
+```
+
+Observation 99 has much higher leverage than the rest. This is largely because the budget was so low for the film.
+```{r}
+Movies[99, ]
+```
+
+We now fit a model without this observation
+```{r}
+MoviesLM_sub <- lm(log(Total.Gross) ~ log(Opening) +  RT + log(Budget), subset=-99)
+
+
+## Prediction intervals
+Movies2010 <- read.csv(paste(file_path, "Movies2010.csv", sep =""))
+
+pred_intervals <- predict(MoviesLM_sub, Movies2010, interval="prediction")
+pred_intervals_trans <- exp(pred_intervals)
+
+target <- Movies2010$Total.Gross
+mean((pred_intervals_trans[, 2] < target) & (pred_intervals_trans[, 3] > target))
+# (pred_intervals_trans[, 2] < target) gives a logical vector
+# The & performs a copmonentwise AND operation
+# Applying the mean function first coerces the logical vector into an vector where
+# TRUE -> 1 and FALSE -> 0
+
+```
+
+Every film is inside its prediction interval. We can also see how well our model predicts film earnings by displaying the true earnings alongside the predicted earnings.
+
+```{r}
+cbind(target, pred_intervals_trans)
+```
+
+Finally, we repeat the procedure with 50% prediction intervals.
+
+```{r}
+pred_intervals <- predict(MoviesLM_sub, Movies2010, interval="prediction",level=0.5)
+pred_intervals_trans <- exp(pred_intervals)
+
+target <- Movies2010$Total.Gross
+mean((pred_intervals_trans[, 2] < target) & (pred_intervals_trans[, 3] > target))
+# (pred_intervals_trans[, 2] < target) gives a logical vector
+# The & performs a copmonentwise AND operation
+# Applying the mean function first coerces the logical vector into an vector where
+# TRUE -> 1 and FALSE -> 0
+```
+
+In this case only half of the observations are in their prediction interval.
