@@ -1,0 +1,124 @@
+---
+output: 
+  pdf_document:
+    fig_width: 6
+    fig_height: 4
+fontsize: 10pt
+papersize: a4paper
+header-includes:
+- \usepackage{amsmath,amsfonts}
+---
+
+\textbf{STATISTICAL MODELLING} \hfill Part IIC, Michaelmas 2019
+
+\vspace{-0.2cm}
+\textbf{Practical 5: ANOVA and ANCOVA} \hfill By courtesy of  Dr. S. A. Bacallado and Dr. R. Shah
+
+## ANOVA solutions
+
+**Why are there no `QualityGood` or `PhotoControl` coefficients in `EssayMarksLM2`?**
+
+This is due to the corner point constraints, which select Good and Control as base categories for the factors Quality and Photo, respectively.
+
+**Write out the models for `EssayMarksLM4` and `EssayMarksLM5`**
+
+If $Y_{ijk}$ are the marks of the $k$th essay with quality $i$ and photo $j$. Then both models have
+
+$$Y_{ijk} = \mu + \alpha_i + \beta_j + \gamma_{ij} +\varepsilon_{ijk}
+\qquad \varepsilon_{ijk}\sim N(0,\sigma^2)$$
+
+In `EssayMarksLM4`, $\alpha_\text{good}=0$, $\beta_\text{control}=\beta_\text{attractive}=0$, and $\gamma_{ij}\neq 0$ only when $i=\text{good}$ and $j=\text{unattractive}$.
+
+In `EssayMarksLM5`, $\alpha_\text{good}=0$, $\beta_\text{control}=0$, and $\gamma_{ij}\neq 0$ only when $j=\text{unattractive}$. As the output of `summary(EssayMarksLM5)` shows, the resulting design matrix is not full rank; in particular, it has rank 5, so one parameter cannot be estimated.
+
+<!-- , with $\gamma_{\text{good},\text{control}}=\gamma_{\text{good},\text{attractive}}$. -->
+
+
+Of course, there are many other ways of choosing the corner-point constraints which would generate the same fitted values $\hat Y$ (and neither of which would avoid the rank 5 of the resulting matrix in `EssayMarksLM5`).
+
+
+**What is the most appropriate model according to AIC?**
+
+```{r echo=F}
+file_path <- "https://raw.githubusercontent.com/AJCoca/SM19/master/"
+EssayMarks <- read.csv(paste0(file_path, "EssayMarks.csv"))
+attach(EssayMarks)
+EssayMarksLM1 <- lm(Mark ~ Quality)
+EssayMarksLM2 <- lm(Mark ~ Quality + Photo)
+EssayMarksLM3 <- lm(Mark ~ Quality*Photo)
+Photo_grp <- Photo
+levels(Photo_grp) <- c("Control+Attr", "Control+Attr", "Unattractive")
+EssayMarksLM4 <- lm(Mark ~ Quality*Photo_grp)
+EssayMarksLM5 <- lm(Mark ~ Quality + Photo + Quality:Photo_grp)
+```
+
+```{r}
+AIC(EssayMarksLM1, EssayMarksLM2, EssayMarksLM3, EssayMarksLM4, EssayMarksLM5)
+```
+
+The most appropriate model according to the AIC is `EssayMarksLM4`. Recall that the AIC approximates the KL divergence between the estimated and true models, so the lower the AIC, the better the fit.
+
+**Would it be possible to compare `EssayMarksLM2` and `EssayMarksLM5` through an $F$-test?**
+
+Yes, as the predictors in the first model are a subset of the second's. Indeed,
+
+```{r}
+anova(EssayMarksLM2,EssayMarksLM5)
+```
+
+**How about `EssayMarksLM2` and `EssayMarksLM4`?**
+
+In this case it isn't possible, because the first model has a coefficient for `PhotoAttractive` which is missing in the second, while the second has interaction terms which are missing in the first. We can check that the `anova` function does not perform a test:
+
+```{r}
+anova(EssayMarksLM2,EssayMarksLM4)
+```
+
+## ANCOVA solutions
+
+```{r echo=F}
+detach(EssayMarks)
+Cycling <- read.csv(paste0(file_path, "Cycling.csv"))
+attach(Cycling)
+```
+
+1) We fit a linear model with passing distance as response.
+
+```{r}
+LM1 <- lm(passing.distance~.,data=Cycling)
+summary(LM1)
+```
+
+Interestingly, most of the vehicle types are significantly different from the base category `bus`. The type of street, the use of a helmet, and the presence of a kerb are also significant. However, the colour of the vehicle is unimportant. The QQ--plot looks bad:
+
+```{r}
+plot(LM1,which=2)
+```
+
+The function `boxcox` fits a Box--Cox transform of the response at various values of $\lambda$ and plots the maximum (or profile) log-likelihood as a function of $\lambda$. The plot shows a confidence region for the optimal value of the parameter which is assymptotically correct.
+
+```{r warning=F}
+library(MASS)
+boxcox(LM1)
+```
+
+Since the optimal value of $\lambda$ is around 1/3, we repeat the fit after a cubic root transform of the response.
+
+```{r}
+LM2 <- lm(I(passing.distance)^(1/3)~.,data=Cycling)
+summary(LM2)
+```
+
+2) The effect of wearing a helmet is highly significant, although probably not practically important---a helmet reduces the passing distance by 1.4 cm on average, while our estimate of the irreducible error $\sigma$ is 8.9 cm. 
+
+3) Since the effect of wearing a helmet is linear in our model, a two-sample test would be able to detect it. However, controlling for all the other variables is very important because it reduces the variance of the response --- we need fewer samples to detect a small effect. 
+
+    We assume that the data were collected in a randomized trial, where the decision to wear a helmet or not in each setting was random and independent from all other variables. If the data were observational, it would become even more important to control for any relevant covariates.
+
+4) Doing backward selection with `stepAIC`, we obtain the following sequence of models.
+
+```{r}
+stepAIC(LM2,direction="backward")
+```
+
+The best model has the predictors `vehicle`, `helmet`, `street`, and `kerb`. It might be possible to improve the model by grouping categories of vehicle and street. 
