@@ -1,0 +1,84 @@
+---
+output: pdf_document
+fontsize: 10pt
+papersize: a4paper
+header-includes:
+- \usepackage{amsmath,amsfonts}
+---
+
+\textbf{STATISTICAL MODELLING} \hfill Part IIC, Michaelmas 2019
+
+\vspace{-0.2cm}
+\textbf{Practical 6: Binomial regression} \hfill By courtesy of Dr. S. A. Bacallado and Dr. R. Shah
+
+## Solutions 
+
+In the log-likelihood ratio test comparing the model `MyopiaLogReg1` to the intercept only model, the $p$-value is $2.6\times 10^{-6}$ which is extremely small, so we should reject the null model with only an intercept. 
+
+### Exercise 1
+
+```{r echo=F}
+file_path <- "https://raw.githubusercontent.com/AJCoca/SM19/master/"
+Myopia <- read.csv(paste0(file_path, "Myopia.csv"))
+attach(Myopia)
+MyopiaLogReg1 <- glm(myopic ~ ., data = Myopia, family = binomial)
+MyopiaLogReg2 <- glm(myopic ~ . + mumMyopic:dadMyopic, 
+                     data = Myopia, family = binomial)
+```
+
+```{r}
+anova(MyopiaLogReg1,MyopiaLogReg2,test="LR")
+```
+
+This test cannot reject the simpler model without interactions between `mumMyopic` and `dadMyopic`.
+
+### Exercise 2
+
+```{r}
+MyopiaLogReg3 <- glm(myopic ~ . -compHR - TVHR, 
+                     data = Myopia, family = binomial)
+anova(MyopiaLogReg3,MyopiaLogReg1,test="LR")
+```
+
+The hours of computer use and TV watching don't seem to be collectively significant.
+
+### Exercise 3
+
+If we include the variable `mumPlusdadMyopic` in the model `ModLogReg3`, the column space of the design matrix does not change, since this variable is the sum of two variables already in the model. Therefore, the fitted values shouldn't change. To make the design of full rank, we must impose a corner point constraint, and we shall require that the coefficient for `dadMyopic` is 0. Therefore, we can interpret the coefficient for `mumMyopic` as the difference in the effects of myopia in the mother and father. To test the hypothesis that the effects are equal, we can use the $z$-test for this coefficient.
+
+```{r}
+mumPlusdadMyopic <- (dadMyopic == "Yes") + (mumMyopic == "Yes")
+MyopiaLogReg4 <- glm(myopic ~ . -compHR - TVHR + mumPlusdadMyopic - dadMyopic, 
+                     data = Myopia, family = binomial)
+summary(MyopiaLogReg4)
+```
+
+We cannot reject the hypothesis that the effects are equal.
+
+### Exercise 4
+
+In order to represent this effect, we can include `mumPlusdadMyopic` in addition to an indicator for the event that both mother and father are myopic.
+
+```{r}
+mumAnddadMyopic <- mumPlusdadMyopic==2
+MyopiaLogReg5 <- glm(myopic ~ . -compHR - TVHR + mumPlusdadMyopic + mumAnddadMyopic
+                     - dadMyopic - mumMyopic , 
+                     data = Myopia, family = binomial)
+```
+
+### Smoking exercise
+
+```{r echo=F}
+detach(Myopia)
+Smoking <- read.csv(paste(file_path, "Smoking.csv", sep =""))
+attach(Smoking)
+total <- Survived + Died
+propDied <- Died / total
+SmokingLogReg1 <- glm(propDied ~ Age.group + Smoker, family = binomial, weights = total)
+```
+
+```{r}
+summary(SmokingLogReg1)
+```
+
+The odds of dying (ratio of the probabilities of dying and not dying) get multiplied by $\exp(0.12497)\approx1.13$ for every year of age (and for the rest of covariates fixed), since the age is represented in a scale of years.
