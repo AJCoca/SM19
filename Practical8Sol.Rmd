@@ -1,0 +1,155 @@
+---
+output: pdf_document
+fontsize: 10pt
+papersize: a4paper
+header-includes:
+- \usepackage{amsmath,amsfonts}
+---
+
+\textbf{STATISTICAL MODELLING} \hfill Part IIC, Michaelmas 2019
+
+
+\textbf{Practical 8: Contingency tables and Gamma regression} \hfill By courtesy of Dr. S. A. Bacallado 
+
+\hfill and Dr. R. Shah
+
+<!--## Solutions 
+
+<!-- ```{r echo=F} -->
+<!-- file_path <- "https://raw.githubusercontent.com/AJCoca/SM19/master/" -->
+<!-- SD_data <- read.csv(paste0(file_path, "SD_match.csv")) -->
+<!-- levels(SD_data$subject_m) <- c("Arts+Humanities", "Econ+Law", "Econ+Law", "Sciences") -->
+<!-- levels(SD_data$subject_f) <- c("Arts+Humanities", "Econ+Law", "Econ+Law", "Sciences") -->
+<!-- SD_subj <- table(SD_data[, c("match", "subject_m", "subject_f")]) -->
+<!-- SD_subj <- as.data.frame(xtabs(Freq ~ subject_m + subject_f + match, data=SD_subj)) -->
+<!-- mod1 <- glm(Freq ~., data=SD_subj, family=poisson) -->
+<!-- ``` -->
+
+<!-- The summary of the GLM fit `mod1` shows two values of deviance: -->
+
+<!-- ```{r} -->
+<!-- summary(mod1) -->
+<!-- ``` -->
+
+<!-- The *residual deviance* is the deviance of the model, while the *null deviance* is the deviance of an intercept-only model. We have seen that when $\sigma^2$ is known, as it is in Poisson regression, the difference of the deviances is a log-likelihood ratio comparing these two models, so by Wilks' Theorem it has a $\chi^2_p$ distribution, where $p$ is the number of predictors (not including the intercept). -->
+
+<!-- However, the practical suggests using the residual deviance `mod1$dev` as a test statistic. Again, since $\sigma^2$ is known, this is a log-likelihood ratio comparing the model to a *saturated model*, that is, a GLM in which the mean for each observation is unrestricted. The saturated model has maximum likelihood -->
+<!-- $$\max_{\mu\in\mathbb R^n} \tilde\ell(y,\mu) = \tilde\ell(y,y).$$ -->
+
+<!-- In general, we cannot apply Wilks' theorem to this test, because the dimension of the alternative hypothesis increases with the number of observations $n$. However, since this is a Poisson regression with large means---we grouped the categories "Econ" and "Law" with this in mind---we can appeal to small dispersion assymptotics and compare the deviance to a $\chi^2_{n-p}$ distribution. The $p$-value is: -->
+
+<!-- ```{r} -->
+<!-- X.shape = dim(model.matrix(mod1)) -->
+<!-- pchisq(mod1$dev,X.shape[1]-X.shape[2],lower.tail=F) -->
+<!-- ``` -->
+
+<!-- This is evidence of a low quality of fit, or against the model `mod1`. -->
+
+<!-- ```{r echo=F} -->
+<!-- mod3 <- glm(Freq ~ subject_m*subject_f + subject_m*match + subject_f*match, data=SD_subj, family=poisson) -->
+<!-- ``` -->
+
+<!-- When we apply the same test on `mod3` we obtain the $p$-value: -->
+
+<!-- ```{r} -->
+<!-- X.shape = dim(model.matrix(mod3)) -->
+<!-- pchisq(mod3$dev,X.shape[1]-X.shape[2],lower.tail=F) -->
+<!-- ``` -->
+
+<!-- which is still lower than 5%, but suggests a better fit than `mod1`. -->
+
+<!-- ## \*The surrogate Poisson model in 3-dimensional contingency tables\* -->
+
+<!-- Suppose we are interested in modelling the probability that two people will match given their subjects of study. It might be best to assume that the number of pairs with each subject combination is fixed, and only model as random the proportion of pairs who are a match. This is akin to fixing the margins of a 2-dimensional contingency table, but in a 3-dimensional example.  -->
+
+<!-- The multinomial model in this case is a binomial regression since there are only 2 categories for the variable `match` (yes or no). We shall show that the surrogate Poisson model in this case is the no three-way interaction model `mod3`. -->
+
+<!-- First, we create a Data Frame that is suitable for Binomial regression. For this, we will use the `reshape` package, which you may install using `install.packages('reshape')`. -->
+
+<!-- ```{r} -->
+<!-- library(reshape) -->
+<!-- SD_subj_bin <- cast(SD_subj,subject_m+subject_f~match,value='Freq') -->
+<!-- SD_subj_bin$total <- SD_subj_bin$`0` + SD_subj_bin$`1` -->
+<!-- SD_subj_bin$prop <- SD_subj_bin$`1`/SD_subj_bin$total -->
+<!-- ``` -->
+
+<!-- Now, we can fit the binomial GLM. -->
+<!-- ```{r} -->
+<!-- mod1bin <- glm(prop~subject_m+subject_f,data=SD_subj_bin, -->
+<!--                family="binomial", weights=SD_subj_bin$total) -->
+<!-- ``` -->
+
+<!-- We can now check that the predictions for the number of matches from the Poisson model with no three-way interactions, and the Binomial regression model with additive effects are the same: -->
+
+<!-- ```{r} -->
+<!-- SD_subj_bin$PredBin = mod1bin$fitted.values*SD_subj_bin$total -->
+<!-- SD_subj$PredPoisson = mod3$fitted.values -->
+<!-- merge(SD_subj[10:18,],SD_subj_bin)[c(1,2,5,10)] -->
+<!-- ``` -->
+
+<!-- In a two-dimensional contingency table, the surrogate Poisson model is the independence model. However, in the three-dimensional case, we need to include all pairwise interactions in the Poisson model to obtain the same fit as in the multinomial regression. -->
+
+## Studying the effect of sociability
+
+Suppose we want to test the effect of sociability, as measured by the variables `go_out_f` and `go_out_m`. In particular, we are interested in the hypothesis that opposites attract. To do this, we can represent the ordinal variables `go_out_f` and `go_out_m` as numbers between 1 and 7, and include a predictor in the Binomial regression model which is the absolute value of their difference.
+
+```{r}
+
+file_path <- "https://raw.githubusercontent.com/AJCoca/SM19/master/"
+SD_data <- read.csv(paste0(file_path, "SD_match.csv"))
+
+levels(SD_data$subject_m) <- c("Arts+Humanities", "Econ+Law", "Econ+Law", "Sciences")
+levels(SD_data$subject_f) <- c("Arts+Humanities", "Econ+Law", "Econ+Law", "Sciences")
+  
+levels(SD_data$go_out_m)
+levels(SD_data$go_out_m) <- c("7","3","5","4","6","1","2")
+levels(SD_data$go_out_f) <- c("7","3","5","4","6","1","2")
+SD_data$diff = abs(as.numeric(SD_data$go_out_m)-as.numeric(SD_data$go_out_f))
+
+# Fit the GLM
+mod2bin <- glm(match~subject_m+subject_f+diff,data=SD_data,family="binomial")
+summary(mod2bin)
+```
+
+There does not seem to be evidence in favor of the hypothesis that opposites attract. By contrast, note, e.g., that the total sociability of the pair has a statistically significant, negative effect on the chance of a match:
+
+```{r}
+SD_data$addSoc = as.numeric(SD_data$go_out_m) + as.numeric(SD_data$go_out_f)
+
+# Fit the GLM
+mod3bin <- glm(match~subject_m+subject_f+addSoc,data=SD_data, family="binomial")
+summary(mod3bin)
+```
+
+## Gamma regression
+
+```{r}
+Drinks <- read.table(paste(file_path, "drinks.txt", sep =""), header = TRUE)
+GammaMod1 <- glm(Time ~ Distance + Cases, family = Gamma, data=Drinks)
+summary(GammaMod1)
+```
+
+The variable that appears not to be significant is `Distance`, so we obtain the second fit through:
+
+```{r}
+GammaMod0 <- glm(Time ~ Cases, family = Gamma, data=Drinks)
+```
+
+We can verify that the $F$-test computed by the `anova` is the same as the one described in the practical sheet.
+
+```{r}
+Ftest <- (GammaMod0$dev - GammaMod1$dev) / summary(GammaMod1)$dispersion
+pf(Ftest, df1 = 1, df2 = 25 - 3, lower.tail = FALSE)
+anova(GammaMod0,GammaMod1,test="F")
+```
+
+There are at least two disadvantages to using the canonical link function. First, since the mean $\mu_i$ is positive, it restricts $x_i^T\beta$ to be positive. Second, it lacks the convenient interpretation of the coefficients furnished by the log-link, i.e. a unit increase in the $j$th predictor multiplies the mean of the response by $\exp(\beta_j)$. 
+
+We can compare the fit of the models `GammaMod1` and `GammaMod2` through their AIC. 
+
+```{r}
+GammaMod2 <- glm(Time ~ Distance + Cases, family = Gamma(link = log), data=Drinks)
+AIC(GammaMod1,GammaMod2)
+```
+
+The second model has a better quality of fit as expected from looking at \texttt{summary(GammaMod2)}.
